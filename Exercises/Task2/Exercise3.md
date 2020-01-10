@@ -1,35 +1,93 @@
-# Task 2 - The pipeline
+# Task 2 - The build
 
-*Estimated time to completion: 35 minutes*
+*Estimated time to completion: 30-60 minutes*
 
-This task assumes that you have access to dev.azure.com in order to create your own project and your own pipeline.  
+To kick off a new build, the script 'Build.ps1' is going to be used. Whether or not you are in a build pipeline, the build script will create all artifacts in your current environment.
 
-*By the way: You can use the PowerShell module [AutomatedLab.Common](https://github.com/automatedlab/automatedlab.common) to automate your interactions with TFS,VSTS and Azure DevOps*
+***Remember to check the [prerequisites](../CheckPrereq.ps1)!***
 
-***Remember to check the [prerequisites](..\CheckPrereq.ps1)!***
+---
 
-## Trigger an automatic build
+## 2.3 Add a new role
 
-With your CI trigger set up from the previous exercise, every change that is committed to the repository invariably starts a new build process - including all test cases. Try it yourself!
+Now, your branch office in Frankfurt has requested a new role for WSUS servers. This requires you to configure the WSUS feature and set a registry key.
 
-1. Either clone your repository locally or change a file online. For example, change to the dev branch and modify the file DSCFile01.yml:  
-    ```powershell
-    cd $home
-    git clone https://dev.azure.com/<YourAccountNameHere>/<YourProjectNameHere/dscworkshop
-    (Get-Content ./dscworkshop/dscsample/dsc_configdata/allnodes/dev/dscfile01.yml) -replace 'Location.*','Location: Buxtehude' |
-    Set-Content -Path ./dscworkshop/dscsample/dsc_configdata/allnodes/dev/dscfile01.yml
-    ```  
-    or if your prefer:  
-    ![UI file editing](./img/CommitChange.png)
-2. Stage and commit your changes locally. No build will be started yet, until you push your changes or, if using a forked repository, raise a pull request:
-    ```powershell
-    cd dscworkshop
-    git add .
-    git commit -m "DSCFile01 changed its location"
+This new role should enable WSUS administrators to build on top of the basic infrastructure.
 
-    # Examine the output of git log to see your local commit in the history of all commits
-    git log
-    ```
-3. Push your committed changes by executing ```git push``` and switch back to Azure DevOps to witness the build being started. To do so, navigate to Pipelines -> Builds to see the build history.
+1. Let us now create a new role for a WSUS Server in the 'DSC\DscConfigData\Roles' folder. This role's YAML will subscribe to the configuration "WindowsFeatures" and will define configuration data (Settings) for the configuration.
+
+Create a new file in 'DSC\DscConfigData\Roles' named 'WsusServer.yml'. Paste the following code into the new file and save it.
+
+  ```yml
+  Configurations:
+  - WindowsFeatures
+  
+  WindowsFeatures:
+    Name:
+    - +UpdateServices
+  ```
+
+2. Now let us add a new node YAML (DSCWS01.yml) in the Pilot which is based on this Role. Create the new file 'DSCWS01.yml' in the folder 'DSC\DscConfigData\AllNodes\Pilot'. Paste the following content into the file and save it.
+
+  ```yml
+  NodeName: DSCWS01
+  Environment: Pilot
+  Role: WsusServer
+  Description: WSUS Server in Pilot
+  Location: Frankfurt
+
+  NetworkIpConfiguration:
+    IpAddress: 192.168.111.120
+
+  PSDscAllowPlainTextPassword: True
+  PSDscAllowDomainUser: True
+
+  LcmConfig:
+    ConfigurationRepositoryWeb:
+      Server:
+        ConfigurationNames: DSCWS01
+  ```
+
+> Note: The YAML rendering does not always show the indention correctly. Please have a look at another node file to check the indention.
+
+Once again, it is that easy. New roles (i.e. WsusServer), environments (i.e. Pilot) and nodes (i.e. DSCWS01) just require adding YAML files. The devil is in the details: Providing the appropriate configuration data for your configurations like the network configuration requires knowledge of the underlying infrastructure of course.
+
+In order to build the new node 'DSCWS01' which uses the 'WsusServer' role, simply start up the build again.
+
+  ```powershell
+  .\Build.ps1
+  ```
+
+After the build has completed take a look at the new nodes resulting files.
+
+> **NOTE: YAML syntax can be tricky so if you have errors during the build it very likely due to not well formed YAML.**
+
+## 2.4 Modify a role
+
+Modifying a role is even easier as adding a new one. Let's try changing the default time server for all the file servers. If the setting effect all time servers, it must be defined in the 'FileServer' role
+
+1. Open the 'FileServer.yml' from your roles directory. We are modifying an already existing role definition now.
+
+2. In order to change a configuration item, just modify or add to your YAML file:
+
+  ```yaml
+  RegistryValues:
+    Values:
+    - Key: HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\W32Time\Parameters
+      ValueName: NtpServer
+      ValueData: pool.contoso.local,0x2
+      ValueType: DWORD
+      Ensure: Present
+  ```
+
+3. After committing your changes, you can restart the build again to see your results in action. All file server artifacts that have been created will now have a modified MOF and RSoP. You can either use the VSCode UI or the following commands: 
+
+  ```powershell
+  git add .
+  git commit -m "Modified the ntp server setting for the file server role."
+  .\Build.ps1
+  ```
+
+You should have a feeling now how easy it is to modify config data used by DSC when using Datum.
 
 Please continue with [Exercise 4](Exercise4.md) when your are ready.
