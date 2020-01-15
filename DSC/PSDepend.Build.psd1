@@ -10,7 +10,7 @@
 
     InvokeBuild       = 'latest'
     BuildHelpers      = 'latest'
-    Pester            = 'latest'
+    #Pester            = 'latest'
     PSScriptAnalyzer  = 'latest'
     DscBuildHelpers   = 'latest'
     Datum             = 'latest'

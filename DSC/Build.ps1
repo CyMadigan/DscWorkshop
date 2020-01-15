@@ -26,7 +26,7 @@ param (
 
     [uri]
     $GalleryProxy,
-    
+
     [Parameter(Position = 0)]
     $Tasks,
 
@@ -67,7 +67,7 @@ Write-Host "Current Process ID is '$PID'"
 #Invoke-WebRequest -Uri 'https://aka.ms/psget-nugetexe' -OutFile C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet\nuget.exe -ErrorAction Stop
 $pathElements = $env:Path -split ';'
 $pathElements += 'C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet'
-$env:Path = $pathElements -join ';'
+$env:Path = ($pathElements|Select-Object -Unique) -join ';'
 
 #cannot be a default parameter value due to https://github.com/PowerShell/PowerShell/issues/4688
 if (-not $ProjectPath) {
@@ -90,8 +90,12 @@ $testsPath = Join-Path -Path $ProjectPath -ChildPath $TestFolder
 
 $psModulePathElemets = $env:PSModulePath -split ';'
 if ($buildModulesPath -notin $psModulePathElemets) {
+<#
     $env:PSModulePath = $psModulePathElemets -join ';'
     $env:PSModulePath += ";$buildModulesPath"
+#>
+    $psModulePathElemets += 'C:\ProgramData\Microsoft\Windows\PowerShell\PowerShellGet'
+    $env:PSModulePath = ($psModulePathElemets|Select-Object -Unique) -join ';'
 }
 
 #importing all resources from .build directory
@@ -172,7 +176,7 @@ if ($MyInvocation.ScriptName -notlike '*Invoke-Build.ps1') {
     Write-Host "Environment Variables" -ForegroundColor Magenta
     dir env: | Out-String | Write-Host -ForegroundColor Magenta
     Write-Host "------------------------------------" -ForegroundColor Magenta
-    
+
     return
 }
 
