@@ -6,6 +6,12 @@ ResolutionPrecedence:
   - Roles\ServerBaseline
   - Roles\DscBaseline
 
+DatumHandlers:
+  Datum.ProtectedData::ProtectedDatum:
+    CommandOptions:
+      PlainTextPassword: SomeSecret
+  Datum.InvokeCommand::InvokeCommand:
+
 default_lookup_options: MostSpecific
 
 lookup_options:

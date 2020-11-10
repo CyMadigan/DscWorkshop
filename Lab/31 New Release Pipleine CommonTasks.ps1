@@ -1,25 +1,24 @@
-﻿$lab = Get-Lab
+﻿$projectName = 'CommonTasks'
+$projectGitUrl = 'https://github.com/DscCommunity/CommonTasks'
+$collectionName = 'AutomatedLab'
+$lab = Get-Lab
 $domain = $lab.Domains[0]
 $devOpsServer = Get-LabVM -Role AzDevOps
 $devOpsHostName = if ($lab.DefaultVirtualizationEngine -eq 'Azure') { $devOpsServer.AzureConnectionInfo.DnsName } else { $devOpsServer.FQDN }
 $nugetServer = Get-LabVM -Role AzDevOps
 $nugetFeed = Get-LabTfsFeed -ComputerName $nugetServer -FeedName PowerShell
 
-$role = $devOpsServer.Roles | Where-Object Name -eq AzDevOps
+$devOpsRole = $devOpsServer.Roles | Where-Object Name -eq AzDevOps
 $devOpsCred = $devOpsServer.GetCredential($lab)
 $devOpsPort = $originalPort = 8080
-if ($role.Properties.ContainsKey('Port'))
+if ($devOpsRole.Properties.ContainsKey('Port'))
 {
-    $devOpsPort = $role.Properties['Port']
+    $devOpsPort = $devOpsRole.Properties['Port']
 }
 if ($lab.DefaultVirtualizationEngine -eq 'Azure')
 {
     $devOpsPort = (Get-LabAzureLoadBalancedPort -DestinationPort $devOpsPort -ComputerName $devOpsServer).Port
 }
-
-$projectName = 'CommonTasks'
-$projectGitUrl = 'https://github.com/AutomatedLab/CommonTasks'
-$collectionName = 'AutomatedLab'
 
 # Which will make use of Azure DevOps, clone the stuff, add the necessary build step, publish the test results and so on
 # You will see two remotes, Origin (Our code on GitHub) and Azure DevOps (Our code pushed to your lab)
@@ -51,7 +50,7 @@ $releaseSteps = @(
             targetType = 'inline'
             script     = @'
 #always make sure the local PowerShell Gallery is registered correctly
-$uri = '$(GalleryUri)'
+$uri = '$(RepositoryUri)'
 $name = 'PowerShell'
 $r = Get-PSRepository -Name $name -ErrorAction SilentlyContinue
 if (-not $r -or $r.SourceLocation -ne $uri -or $r.PublishLocation -ne $uri) {
@@ -83,7 +82,7 @@ if (-not $r -or $r.SourceLocation -ne $uri -or $r.PublishLocation -ne $uri) {
             script     = @'
 Write-Host "$(System.DefaultWorkingDirectory)"
 Set-Location -Path "$(System.DefaultWorkingDirectory)\$(Build.DefinitionName)\SourcesDirectory"
-.\Build.ps1 -Tasks Init, SetPsModulePath, Deploy, TestReleaseAcceptance -GalleryRepository PowerShell
+.\Build.ps1 -Tasks Init, SetPsModulePath, Deploy, TestReleaseAcceptance -Repository PowerShell
 '@
         }
     }
@@ -112,7 +111,7 @@ $releaseEnvironments = @(
             uniqueName  = 'Install'
         }
         variables           = @{
-            GalleryUri = @{ value = $nugetFeed.NugetV2Url }
+            RepositoryUri = @{ value = $nugetFeed.NugetV2Url }
             NugetApiKey = @{ value = $nugetFeed.NugetApiKey }            
         }
         preDeployApprovals  = @{
@@ -201,7 +200,6 @@ $releaseEnvironments = @(
 #endregion
 
 $repo = Get-TfsGitRepository -InstanceName $devOpsHostName -Port $devOpsPort -CollectionName $collectionName -ProjectName $projectName -Credential $devOpsCred -UseSsl -SkipCertificateCheck
-$repo.remoteUrl = $repo.remoteUrl -replace $originalPort, $devOpsPort
 
 $param =  @{
     Uri = "https://$($devOpsHostName):$devOpsPort/$collectionName/_apis/git/repositories/{$($repo.id)}/refs?api-version=4.1"
@@ -213,21 +211,20 @@ if ($PSVersionTable.PSEdition -eq 'Core')
 }
 $refs = (Invoke-RestMethod @param).value.name
 
-Invoke-LabCommand -ActivityName 'Set GalleryUri and create Build Pipeline' -ScriptBlock {
+Invoke-LabCommand -ActivityName 'Set RepositoryUri and create Build Pipeline' -ScriptBlock {
 
     Set-Location -Path C:\Git\CommonTasks
+    git checkout dev *>$null
     $c = Get-Content '.\azure-pipelines On-Prem.yml' -Raw
-    $c = $c -replace '  GalleryUri: ggggg', "  GalleryUri: $($nugetFeed.NugetV2Url)"
-    $c = $c -replace '  Domain: ddddd', "  Domain: $($nugetFeed.NugetCredential.GetNetworkCredential().Domain)"
-    $c = $c -replace '  UserName: uuuuu', "  Username: $($nugetFeed.NugetCredential.GetNetworkCredential().UserName)"
-    $c = $c -replace '  Password: ppppp', "  Password: $($nugetFeed.NugetCredential.GetNetworkCredential().Password)"
+    $c = $c -replace '  RepositoryUri: ggggg', "  RepositoryUri: $($nugetFeed.NugetV2Url)"
     $c | Set-Content '.\azure-pipelines.yml'
     git add .
-    git commit -m 'Set GalleryUri and create Build Pipeline'
+    git commit -m 'Set RepositoryUri and create Build Pipeline'
     git push 2>$null
 
 } -ComputerName $devOpsServer -Variable (Get-Variable -Name nugetFeed)
 
+Start-Sleep -Seconds 10
 New-TfsReleaseDefinition -ProjectName $projectName -InstanceName $devOpsHostName -Port $devOpsPort -ReleaseName "$($projectName) CD" -Environments $releaseEnvironments -Credential $devOpsCred -CollectionName $collectionName -UseSsl -SkipCertificateCheck
 
 Write-ScreenInfo done

@@ -1,11 +1,15 @@
 $here = $PSScriptRoot
+if ($global:Filter -and $global:Filter.ToString() -and -not $Filter.ToString())
+{
+    $Filter = $global:Filter
+}
 
 $datumDefinitionFile = Join-Path $here ..\..\DscConfigData\Datum.yml
 $nodeDefinitions = Get-ChildItem $here\..\..\DscConfigData\AllNodes -Recurse -Include *.yml
 $environments = (Get-ChildItem $here\..\..\DscConfigData\AllNodes -Directory).BaseName
 $roleDefinitions = Get-ChildItem $here\..\..\DscConfigData\Roles -Recurse -Include *.yml
 $datum = New-DatumStructure -DefinitionFile $datumDefinitionFile
-$configurationData = Get-FilteredConfigurationData -Environment $environment -Datum $datum -Filter $filter
+$configurationData = Get-FilteredConfigurationData -Filter $Filter -Environment $environment -Datum $datum -CurrentJobNumber $currentJobNumber -TotalJobCount $totalJobCount
 
 $nodeNames = [System.Collections.ArrayList]::new()
 
@@ -25,8 +29,8 @@ Describe 'Pull Server Deployment' -Tag BuildAcceptance, PullServer {
 
 Describe 'MOF Files' -Tag BuildAcceptance {
     BeforeAll {
-        $mofFiles = Get-ChildItem -Path "$buildOutput\MOF" -Filter *.mof
-        $metaMofFiles = Get-ChildItem -Path "$buildOutput\MetaMOF" -Filter *.mof
+        $mofFiles = Get-ChildItem -Path "$buildOutput\MOF" -Filter *.mof -ErrorAction SilentlyContinue
+        $metaMofFiles = Get-ChildItem -Path "$buildOutput\MetaMOF" -Filter *.mof -ErrorAction SilentlyContinue
         $nodes = $configurationData.AllNodes
     }
 
