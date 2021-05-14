@@ -21,8 +21,8 @@ Add-LabDomainDefinition -Name contoso.com -AdminUser Install -AdminPassword Some
 Set-LabInstallationCredential -Username Install -Password Somepass1
 
 # Add the reference to our necessary ISO files
-Add-LabIsoImageDefinition -Name AzDevOps -Path $labSources\ISOs\mu_azure_devops_server_2020_x64_dvd_633b160b.iso #from https://visualstudio.microsoft.com/downloads/
-Add-LabIsoImageDefinition -Name SQLServer2017 -Path $labsources\ISOs\SQLServer2017-x64-ENU.iso #from https://www.microsoft.com/en-us/evalcenter/evaluate-sql-server-2017-rtm. The EXE downloads the ISO.
+Add-LabIsoImageDefinition -Name AzDevOps -Path $labSources\ISOs\mu_azure_devops_server_2020.0.1_x64_dvd_6622c455.iso #from https://docs.microsoft.com/en-us/azure/devops/server/download/azuredevopsserver?view=azure-devops
+Add-LabIsoImageDefinition -Name SQLServer2019 -Path $labsources\ISOs\SQLServer2019-x64-ENU.iso #from https://www.microsoft.com/en-us/evalcenter/evaluate-sql-server-2019. The EXE downloads the ISO.
 
 #defining default parameter values, as these ones are the same for all the machines
 $PSDefaultParameterValues = @{
@@ -46,7 +46,7 @@ $netAdapter += New-LabNetworkAdapterDefinition -VirtualSwitch $labName -Ipv4Addr
 $netAdapter += New-LabNetworkAdapterDefinition -VirtualSwitch 'Default Switch' -UseDhcp
 
 # SQL and PKI
-Add-LabMachineDefinition -Name DSCCASQL01 -Memory 3GB -Roles CaRoot, SQLServer2017, Routing -NetworkAdapter $netAdapter
+Add-LabMachineDefinition -Name DSCCASQL01 -Memory 3GB -Roles CaRoot, SQLServer2019, Routing -NetworkAdapter $netAdapter
 
 # DSC Pull Server with SQL server backing, Azure DevOps Build Worker
 $roles = @(
@@ -59,7 +59,7 @@ $roles = @(
     Get-LabMachineRoleDefinition -Role TfsBuildWorker -Properties @{ NumberOfBuildWorkers = '4' }
     Get-LabMachineRoleDefinition -Role WebServer
 )
-Add-LabMachineDefinition -Name DSCPULL01 -Memory 4GB -Roles $roles -IpAddress 192.168.111.60 -OperatingSystem 'Windows Server 2019 Datacenter (Desktop Experience)'
+Add-LabMachineDefinition -Name DSCPull01 -Memory 4GB -Roles $roles -IpAddress 192.168.111.60 -OperatingSystem 'Windows Server 2019 Datacenter (Desktop Experience)'
 
 # Build Server
 Add-LabMachineDefinition -Name DSCDO01 -Memory 4GB -Roles AzDevOps -IpAddress 192.168.111.70
@@ -86,7 +86,11 @@ Add-LabMachineDefinition -Name DSCWeb03 -Memory 1GB -Roles WebServer -IpAddress 
 Install-Lab
 
 Enable-LabCertificateAutoenrollment -Computer -User
-Install-LabWindowsFeature -ComputerName (Get-LabVM -Role DSCPullServer, FileServer, WebServer, AzDevOps) -FeatureName RSAT-AD-Tools
+Invoke-LabCommand -ActivityName 'Disable Windows Update Service and DisableRealtimeMonitoring' -ComputerName (Get-LabVM) -ScriptBlock {
+    Stop-Service -Name wuauserv
+    Set-Service -Name wuauserv -StartupType Disabled
+    Set-MpPreference -DisableRealtimeMonitoring $true
+}
 
 Invoke-LabCommand -ActivityName 'Disable Windows Update service' -ComputerName (Get-LabVM) -ScriptBlock { Stop-Service -Name wuauserv; Set-Service -Name wuauserv -StartupType Disabled }
 

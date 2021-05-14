@@ -8,7 +8,7 @@ DscTagging:
   Version: 0.3.0
 
 DscLcmMaintenanceWindows:
-  MaintenanceWindow:
+  MaintenanceWindows:
     - Name: Always
       StartTime: 00:00:00
       Timespan: 24:00:00
@@ -33,6 +33,8 @@ DscLcmController:
   MaintenanceWindowOverride: false   #   REPORT IS SENT EVERY 5 MINUTES.
   WriteTranscripts: true             #
   SendDscTaggingData: true           #
+  MaxLcmRuntime: 00:30:00            #
+  LogHistoryTimeSpan: 7.00:00:00     #
 
 LcmConfig:
   Settings:

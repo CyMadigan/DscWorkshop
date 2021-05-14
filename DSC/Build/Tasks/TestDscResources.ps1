@@ -12,14 +12,17 @@ task TestDscResources {
         if (-not $m) {
             Write-Error "The module 'CommonTasks' containing the configurations could not be found. Please check the file 'PSDepend.DscConfigurations.psd1' and verify if the module is available in the given repository" -ErrorAction Stop
         }
-        $resourceCount = (dir -Path "$($m.ModuleBase)\DscResources").Count
+        $resources = dir -Path "$($m.ModuleBase)\DscResources"
+        $resourceCount = $resources.Count
         Write-Host "ResourceCount $resourceCount"
 
         $maxIterations = 5
         while ($resourceCount -ne (Get-DscResource -Module CommonTasks).Count -and $maxIterations -gt 0) {
+            $dscResources = Get-DscResource -Module CommonTasks
+            Write-Host "ResourceCount DOES NOT match, currently '$($dscResources.Count)'. Resources missing:"
+            Write-Host (Compare-Object -ReferenceObject $resources.Name -DifferenceObject $dscResources.Name).InputObject
             Start-Sleep -Seconds 5
             $maxIterations--
-            Write-Host "ResourceCount DOES NOT match, currently '$((Get-DscResource -Module CommonTasks).Count)'"
         }
         if ($maxIterations -eq 0) {
             throw 'Could not get the expected DSC Resource count'
@@ -35,7 +38,7 @@ task TestDscResources {
         Write-Host 'Known DSC Resources'
         Write-Host ------------------------------------------------------------
         Write-Host
-        Import-LocalizedData -BindingVariable requiredResources -FileName PSDepend.DscResources.psd1 -BaseDirectory $ProjectPath\Build\PSDepend
+        Import-LocalizedData -BindingVariable requiredResources -FileName PSDepend.DscResources.psd1 -BaseDirectory $ProjectPath
         $requiredResources = @($requiredResources.GetEnumerator() | Where-Object { $_.Name -ne 'PSDependOptions' })
         $requiredResources.GetEnumerator() | Foreach-Object {
             $rr = $_

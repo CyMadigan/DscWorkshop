@@ -89,7 +89,7 @@ function Send-DscTaggingData {
     Write-Host "DscDataEndpoint uses SQL Server '$sqlServerName'."
 
     $Data.psobject.Properties.Remove('RunspaceId')
-    $Data.psobject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Timestamp', (Get-Date)))
+    $Data.psobject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('Timestamp', [string](Get-Date)))
     $Data.psobject.Properties.Add([System.Management.Automation.PSNoteProperty]::new('AgentId', $agentId))
 
     $cmd = "SELECT AgentId FROM dbo.TaggingData WHERE AgentID = '$($Data.AgentId)'"
@@ -219,4 +219,11 @@ Remove-Item -Path $modulePath -Recurse -Force -ErrorAction SilentlyContinue
 
 DscTaggingRole
 
+$trigger = New-JobTrigger -At (Get-Date).AddMinutes(1) -Once
+Register-ScheduledJob -Name StartWinRmService  -ScriptBlock {
+    Start-Service -Name WinRM
+} -Trigger $trigger -ErrorAction SilentlyContinue
+
 Register-CustomPSSessionConfiguration -EndpointName $EndpointName -AllowedPrincipals $AllowedPrincipals
+
+Unregister-ScheduledJob -Name StartWinRmService

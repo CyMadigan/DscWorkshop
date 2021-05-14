@@ -130,20 +130,23 @@ if ($MyInvocation.ScriptName -notlike '*Invoke-Build.ps1') {
     }
 
     if (($Tasks -contains 'CompileRootConfiguration' -or $Tasks -contains 'CompileRootMetaMof') -or -not $Tasks) {
-        Invoke-Build -File "$ProjectPath\PostBuild.ps1"
+        Invoke-Build -File "$ProjectPath\PostBuild.ps1" -BuildOutput $BuildOutput `
+                                                        -ResourcesFolder $ResourcesFolder `
+                                                        -ConfigDataFolder $ConfigDataFolder `
+                                                        -ConfigurationsFolder $ConfigurationsFolder
     }
 
     $mofFileCount = (Get-ChildItem -Path "$BuildOutput\MOF" -Filter *.mof -ErrorAction SilentlyContinue).Count
     Write-Host "Created $mofFileCount MOF files in '$BuildOutput/MOF'" -ForegroundColor Green
 
     #Debug Output
-    Write-Host "------------------------------------" -ForegroundColor Magenta
-    Write-Host "PowerShell Variables" -ForegroundColor Magenta
-    Get-Variable | Out-String | Write-Host -ForegroundColor Magenta
-    Write-Host "------------------------------------" -ForegroundColor Magenta
-    Write-Host "Environment Variables" -ForegroundColor Magenta
-    dir env: | Out-String | Write-Host -ForegroundColor Magenta
-    Write-Host "------------------------------------" -ForegroundColor Magenta
+    #Write-Host "------------------------------------" -ForegroundColor Magenta
+    #Write-Host "PowerShell Variables" -ForegroundColor Magenta
+    #Get-Variable | Out-String | Write-Host -ForegroundColor Magenta
+    #Write-Host "------------------------------------" -ForegroundColor Magenta
+    #Write-Host "Environment Variables" -ForegroundColor Magenta
+    #dir env: | Out-String | Write-Host -ForegroundColor Magenta
+    #Write-Host "------------------------------------" -ForegroundColor Magenta
     
     return
 }
@@ -156,9 +159,9 @@ if (-not $Tasks) {
     task . Init,
     CleanBuildOutput,
     SetPsModulePath,
+    LoadDatumConfigData,
     TestConfigData,
     VersionControl,
-    LoadDatumConfigData,
     CompileDatumRsop,
     TestDscResources,
     CompileRootConfiguration,
